@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: coral-device-plugin
+  namespace: coral
+  labels:
+    app: coral-device-plugin
+spec:
+  selector:
+    matchLabels:
+      app: coral-device-plugin
+  template:
+    metadata:
+      labels:
+        app: coral-device-plugin
+    spec:
+      nodeSelector:
+        coral: usb
+      priorityClassName: system-node-critical
+      containers:
+        - name: plugin
+          image: initialed85/coral-plugin:dev
+          imagePullPolicy: Always
+          # The plugin must be able to create its unix socket here, and the
+          # kubelet only scans this directory at startup / on plugin restart.
+          volumeMounts:
+            - name: device-plugin-dir
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: usb-devices
+              mountPath: /dev/bus/usb
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: device-plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+            type: Directory
+        - name: usb-devices
+          hostPath:
+            path: /dev/bus/usb
+            type: Directory

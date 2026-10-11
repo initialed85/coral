@@ -1,0 +1,24 @@
+# One-shot hardware validation: requests the Coral through the device plugin
+# (no privileged mode, no hostPath) and runs inference.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: coral-validate
+  namespace: coral
+  labels:
+    app: coral-validate
+spec:
+  nodeName: betta
+  restartPolicy: Never
+  containers:
+    - name: validate
+      image: initialed85/coral-yolo:dev
+      imagePullPolicy: Always
+      command: ["python", "validate.py"]
+      resources:
+        limits:
+          home.com/coral: 1
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]

@@ -1,0 +1,13 @@
+# Google Coral USB Accelerator (Edge TPU)
+#
+# The board enumerates under two different USB identities depending on whether
+# the Apex firmware is loaded:
+#   1a6e:089a  Global Unichip Corp.  (boot/flash mode)
+#   18d1:9302  Google Inc.           (runtime mode, what libusb actually talks to)
+#
+# Device nodes are created root:root 0664, so a non-root container cannot write
+# to them. Make them group-writable for plugdev and add a stable symlink, so a
+# plain (non-privileged) pod can talk to the TPU once the device plugin grants
+# the cgroup permission.
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a6e", MODE="0666", SYMLINK+="coral", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="9302", MODE="0666", SYMLINK+="coral", GROUP="plugdev"

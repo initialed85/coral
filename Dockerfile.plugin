@@ -1,0 +1,20 @@
+# Device plugin for the Google Coral Edge TPU.
+# Talks gRPC to the kubelet over /var/lib/kubelet/device-plugins/coral.sock.
+FROM python:3.9-slim-bullseye
+
+RUN set -eux; \
+    printf 'deb http://archive.debian.org/debian bullseye main\n' > /etc/apt/sources.list; \
+    printf 'deb http://archive.debian.org/debian-security bullseye-security main\n' >> /etc/apt/sources.list; \
+    apt-get -o Acquire::Check-Valid-Until=false update; \
+    apt-get install -y --no-install-recommends ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "grpcio==1.60.0" "protobuf==4.25.3" "grpcio-tools==1.60.0"
+
+WORKDIR /app
+COPY vendor/api.proto /app/proto/api.proto
+RUN python -m grpc_tools.protoc -I/app/proto --python_out=/app --grpc_python_out=/app /app/proto/api.proto
+
+COPY plugin/coral_plugin.py /app/
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "coral_plugin.py"]

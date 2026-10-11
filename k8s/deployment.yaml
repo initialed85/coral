@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coral-yolo
+  namespace: coral
+  labels:
+    app: coral-yolo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coral-yolo
+  template:
+    metadata:
+      labels:
+        app: coral-yolo
+    spec:
+      nodeSelector:
+        coral: usb
+      containers:
+        - name: yolo
+          image: initialed85/coral-yolo:dev
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: CORAL_MODEL
+              value: /app/models/yolov5s-int8-224_edgetpu.tflite
+            - name: CORAL_NAMES
+              value: /app/coco.yaml
+            - name: CORAL_CONF
+              value: "0.25"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+              home.com/coral: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coral-yolo
+  namespace: coral
+  labels:
+    app: coral-yolo
+spec:
+  selector:
+    app: coral-yolo
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
