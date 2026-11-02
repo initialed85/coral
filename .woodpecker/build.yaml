@@ -1,0 +1,57 @@
+# Publish the two images ./build.sh builds — the YOLO service and the classifier plugin — and stamp the
+# prod app that runs the YOLO one.
+#
+# This is the one prod deploy in this batch. The base image is python:3.9-slim-bullseye pulled from
+# archive.debian.org (Google retired the Coral apt repo and Bullseye is EOL), so the build is slow and
+# depends on an archive mirror: if the build fails, the running pod keeps its last image.
+#
+# The pipeline runs on master only. There is no smoke test: the service is only useful with a Coral
+# plugged in, and the prod node is the only one with one.
+steps:
+  - name: build-and-push
+    image: docker.io/library/docker:cli
+    privileged: true
+    environment:
+      DOCKER_HOST: tcp://docker-beefcake-ci-1:2375
+      IMAGE: docker.io/initialed85/coral-yolo
+      PLUGIN_IMAGE: docker.io/initialed85/coral-plugin
+    backend_options:
+      kubernetes:
+        secrets:
+          - name: dockerhub
+            key: username
+            target:
+              env: DOCKERHUB_USER
+          - name: dockerhub
+            key: token
+            target:
+              env: DOCKERHUB_TOKEN
+    commands:
+      - docker info --format 'daemon={{.Name}} images_before={{.Images}}'
+      - echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USER" --password-stdin
+      - docker build --platform=linux/amd64 -t "$IMAGE:$CI_COMMIT_SHA" -t "$IMAGE:latest" .
+      - docker push "$IMAGE:$CI_COMMIT_SHA" && docker push "$IMAGE:latest"
+      - docker build --platform=linux/amd64 -f Dockerfile.plugin -t "$PLUGIN_IMAGE:$CI_COMMIT_SHA" -t "$PLUGIN_IMAGE:latest" .
+      - docker push "$PLUGIN_IMAGE:$CI_COMMIT_SHA" && docker push "$PLUGIN_IMAGE:latest"
+
+  - name: deploy-home-ops
+    image: docker.io/initialed85/wp-kustomize-deploy:latest
+    depends_on: [build-and-push]
+    settings:
+      image: docker.io/initialed85/coral-yolo
+      dir: clusters/prod/applications/coral
+    backend_options:
+      kubernetes:
+        secrets:
+          - name: home-ops-deploy-key
+            key: id_ed25519
+            target:
+              env: PLUGIN_DEPLOY_KEY
+          - name: home-ops-deploy-key
+            key: known_hosts
+            target:
+              env: PLUGIN_KNOWN_HOSTS
+
+when:
+  - event: push
+    branch: master

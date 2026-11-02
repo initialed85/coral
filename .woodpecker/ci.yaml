@@ -1,0 +1,14 @@
+# The Coral Edge TPU service is Python 3.9 (pycoral only ships cp39 wheels) and the model is exercised
+# on real hardware, so the gate here is that the modules compile and the vendored wheel set is
+# consistent. The image build is in build.yaml.
+steps:
+  - name: check
+    image: docker.io/library/python:3.9-slim
+    commands:
+      - python --version
+      - python -m compileall -q app plugin
+
+when:
+  - event: push
+    branch: master
+  - event: pull_request
